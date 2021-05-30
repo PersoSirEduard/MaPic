@@ -14,26 +14,19 @@
 </template>
 
 <script>
-import { defineComponent } from 'vue'
-
-export default defineComponent({
-  setup() {
-  },
-  components: {
-  }
-})
+export default {
+  name: 'About'
+}
 </script>
 
-<style scoped lang="scss">
-@import '../sass/variables.scss';
+<style scoped>
 .about-s1 {
   color: white; 
-  background-color: $lighter;
+  background-color: #303a59;
   width: 400px;
   margin: 0 auto;
   padding: 10px 0;
 }
-
 @media screen and (min-width: 750px) {
   .about-s1 {
     width: 750px;

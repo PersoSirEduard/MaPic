@@ -11,11 +11,10 @@ const fs = require("fs");
 */
 
 const storage = new Storage({
-    keyFilename: './server/helpers/google_keys/google_storage_api_key.json',
-    projectId: 'mapic-313117'
+    keyFilename: './server/helpers/google_keys/google_storage_api_key.json'
 }); // Google Cloud storage
 
-const bucketName = "mapic_bucket"; // Cloud storage bucket name
+const bucketName = "mapic_posts"; // Cloud storage bucket name
 
 async function uploadToStorage(base64_img) { // Upload image as base64 and return url
 

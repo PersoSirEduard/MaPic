@@ -52,84 +52,62 @@
   </div>
 </template>
 <script>
-import { defineComponent } from 'vue'
+import config from "../config"
+import {fetchPostData, /*fetchGetData*/} from "../http-common"
 
-export default defineComponent({
-  setup() {
-    
-  },
+export default {
+  name: 'Signup',
   data() {
       return {
             form: {
-              userName: '',
+            userName: '',
             email: '',
             password: '',
             },
-            show: true,
-            loggedIn: false,
+            show: true
         } 
     },
     methods: {
-      onSubmit(event) {
+    async onSubmit(event) {
         event.preventDefault()
-        const expressServerBase = "http://localhost:8082/";
-        const url =  expressServerBase + "api/account/signup";
-        const data = {
+
+        const url =  config.apiUrl + "api/account/signup";
+        const sendData = {
             email: this.form.email,
             password: this.form.password,
             userName: this.form.userName,
         }
-        fetch(url, {
-          method: 'POST',
-          mode: 'no-cors',
-          cache: "no-cache",
-          credentials: 'same-origin',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          redirect: "follow",
-          referrerPolicy: "no-referrer",
-          body: JSON.stringify(data)
-        }).then(res => {
-           const ans = JSON.parse(res.json())
-          if (ans.success) {
-            //successful login
-            alert(JSON.stringify(res.json()))
-            document.cookie=`token=${ans.token};`
-          } else{
-            // failed login
-            alert("failed")
-          }
-        })
-      },
-      verify(token) {
-        const expressServerBase = "http://localhost:8082/";
-        const url = expressServerBase + "api/account/verify?token=" + token;
-        
-        fetch(url).then((res) =>{
-            console.log(JSON.stringify(res.json()));
-            var ans = JSON.parse(res.json())
-            if (ans.sucess) {
-            this.loggedIn = true;
-            this.$router.push('/') //redirecting user to homepage if already logged in
+
+        var answer = await fetchPostData(url, sendData)
+            console.log(answer);
+            if (answer.success) {
+                // Successful login
+                var cookie = `token=${answer.token}`
+                alert(answer.message)
+                console.log(cookie)
+                document.cookie = cookie
+                this.$router.push('/') // Redirecting user to homepage if already logged in
+                
+            } else {
+                // Failed login
+                alert("Failed")
             }
-        });
-        },
-      emailValidator() {
-            const re = /\S+@\S+\.\S+/
-            if (!this.form.email || this.form.email.length <= 0) return "Email can't be empty."
-            if (!re.test(this.form.email)) return 'Ooops! We need a valid email address.'
-            return ''
-        },
-      nameValidator() {
+      },
+    emailValidator() {
+        const re = /\S+@\S+\.\S+/
+        if (!this.form.email || this.form.email.length <= 0) return "Email can't be empty."
+        if (!re.test(this.form.email)) return 'Ooops! We need a valid email address.'
+        return ''
+    },
+    nameValidator() {
         if (!this.form.userName || this.form.userName.length <= 0) return "Name can't be empty."
         return ''
-        },
-      passwordValidator() {
-            if (!this.form.password || this.form.password.length <= 0) return "Password can't be empty."
-                return ''
     },
-      onReset(event) {
+    passwordValidator() {
+        if (!this.form.password || this.form.password.length <= 0) return "Password can't be empty."
+        return ''
+    },
+    onReset(event) {
         event.preventDefault()
         // Reset our form values
         this.form.email = ''
@@ -142,7 +120,7 @@ export default defineComponent({
         })
       }
     }
-})
+}
 </script>
 <style scoped>
 .signup {
@@ -167,7 +145,6 @@ label {
   letter-spacing: 1.2px;
   color: #949494
 }
-
 @media screen and (min-width: 750px) {  
   #input-group-2, #input-group-1, #input-group-3 {
     width: 600px;

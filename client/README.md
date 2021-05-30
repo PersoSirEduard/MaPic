@@ -1,12 +1,9 @@
-# MaPic Front End
+# mapic-frontend
 
-### Project setup
-Install required libraries with:
+## Project setup
 ```
 npm install
 ```
-### Configure the frontend
-Configure 'config.js
 
 ### Compiles and hot-reloads for development
 ```

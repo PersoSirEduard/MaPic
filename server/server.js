@@ -4,6 +4,7 @@ const historyApiFallback = require('connect-history-api-fallback');
 const mongoose = require('mongoose');
 const path = require('path');
 const bodyParser = require('body-parser')
+const cors = require('cors')
 
 const config = require('./config/config');
 
@@ -24,6 +25,7 @@ mongoose.Promise = global.Promise;
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json({limit: '10mb'})); // Max 10 MB size GET & POST requests
+app.use(cors());
 
 
 // API routes

@@ -1,6 +1,6 @@
 const User = require("../../models/User");
 const UserSession = require("../../models/UserSession");
-
+const jwt = require('jsonwebtoken');
 
 /*
     ==============
@@ -39,7 +39,8 @@ module.exports = app => {
 
   app.post("/api/account/signup", (req, res, next) => { // Create new account
     const { body } = req;
-    const { userName, password, email } = body;
+    var { userName, password, email } = body;
+    console.log(body)
 
     if (!userName) { // Check if username exists
       return res.send({
@@ -102,23 +103,36 @@ module.exports = app => {
             });
           }
           // Create a new user session
+          
           const userSession = new UserSession();
           userSession.userId = user._id;
           userSession.user_name = userName;
+          var token = jwt.sign({ 
+            data: {
+              userId: userSession.userId,
+              user_name: userSession.user_name
+          },
+            exp: Math.floor(Date.now() / 1000) + (60 * 60)
+          }, 'private key');
+
+          userSession.token = token
+
           userSession.save((err, doc) => {
             if (err) {
               return res.send({
                 success: false,
-                message: "Error: server error"
-              });
+                token: "",
+                message: "Server Error: Could not create a user session.",
+              })
+            } else {
+              return res.send({
+                success: true,
+                token: token,
+                message: "Successfully created a new user."
+              })
             }
-
-            return res.send({
-              success: true,
-              message: "Signed up succesfully",
-              token: doc._id
-            });
           });
+
         });
       });
     });
@@ -206,32 +220,42 @@ module.exports = app => {
 
     // Verify the token is one of a kind and its not deleted
 
-    UserSession.findOne(
-      {
-        _id: token,
-        isDeleted: false
-      },
-      (err, sessions) => {
-        if (err) {
-          return res.send({
-            success: false,
-            message: "Error: Server error"
+    jwt.verify(token, 'private key', function(err, decoded) { // Verify if token is valid first and if not expired
+      if (err) {
+        UserSession.deleteOne({ token: token });
+        return res.send({
+          success: false,
+          message: "Error: Invalid or expired session."
+        });
+      } else {
+        UserSession.findOne( // Verify if token is in user sessions database
+          {
+            token: token,
+            isDeleted: false
+          },
+          (err, sessions) => {
+            if (err) {
+              return res.send({
+                success: false,
+                message: "Error: Server error."
+              });
+            }
+            if (sessions == null) {
+              return res.send({
+                success: false,
+                message: "Error: Invalid session."
+              });
+            } else {
+              return res.send({
+                success: true,
+                message: "Verified",
+                user_name: sessions.user_name
+              });
+            }
           });
-        }
-        if (sessions == null) {
-          return res.send({
-            success: false,
-            message: "Error: Invalid"
-          });
-        } else {
-          return res.send({
-            success: true,
-            message: "Verified",
-            user_name: sessions.user_name
-          });
-        }
+      }
       });
-  });
+    });
 
   /*
     ========
@@ -246,16 +270,14 @@ module.exports = app => {
 
     //verify the token is one of a kind and its not deleted
 
-    UserSession.findOneAndUpdate(
+    UserSession.findOneAndDelete(
       {
-        _id: token,
+        token: token,
         isDeleted: false
       },
-      { $set: { isDeleted: true } },
-      null,
       (err, sessions) => {
         if (err) {
-          // console.log("Auth deleting error" + err);
+          console.log("Auth deleting error" + err);
           return res.send({
             success: false,
             message: "Error: Server error"
@@ -268,4 +290,5 @@ module.exports = app => {
         });
       });
   });
+
 };

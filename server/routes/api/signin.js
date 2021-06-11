@@ -30,6 +30,45 @@ const jwt = require('jsonwebtoken');
     
 */
 
+function createNewSession(userId, userName) { // Create new session for user
+  return new Promise((resolve, reject) => {
+
+
+    // Verify if session already exists
+    UserSession.findOne( // Verify if the token is in user sessions database already
+      {
+        userName: userName,
+        isDeleted: false
+      },
+      (err, session) => {
+        if (!err) {
+          resolve(session.token);
+        }
+      });
+
+    const userSession = new UserSession();
+
+    userSession.userId = userId;
+    userSession.userName = userName;
+
+    // Generate new session token
+    userSession.token = userSession.generateToken(userId, userName);
+
+    userSession.save((err, doc) => {
+
+      if (err) {
+
+        reject(false);
+
+      } else {
+
+        resolve(userSession.token);
+
+      }
+    });
+  });
+}
+
 module.exports = app => {
   /*
     ========
@@ -40,7 +79,6 @@ module.exports = app => {
   app.post("/api/account/signup", (req, res, next) => { // Create new account
     const { body } = req;
     var { userName, password, email } = body;
-    console.log(body)
 
     if (!userName) { // Check if username exists
       return res.send({
@@ -66,27 +104,36 @@ module.exports = app => {
     // Steps:
     // Verify if email doesn't exist in database
     User.find({ email: email }, (err, previousUsers) => {
+
       if (err) {
+
         return res.send({ success: false, message: "Error: Server error" });
+
       } else if (previousUsers.length > 0) {
+        // Email already used
         return res.send({
           success: false,
           message: "Error: Email already in use."
         });
+
       }
 
       // Verify username isn't already taken
       User.find({ userName: userName }, (err, previousUsers) => {
         if (err) {
+
           return res.send({
             success: false,
             message: "Error: Server error"
           });
+
         } else if (previousUsers.length > 0) {
+          // Username already used
           return res.send({
             success: false,
             message: "Error: Username already in use."
           });
+
         }
 
         // Save the new user
@@ -94,42 +141,35 @@ module.exports = app => {
 
         newUser.email = email;
         newUser.userName = userName;
-        newUser.password = newUser.generateHash(password);
+        newUser.password = newUser.generateHash(password); // Encrypt password
+
         newUser.save((err, user) => {
+
           if (err) {
             return res.send({
               success: false,
               message: "Error: Server error"
             });
           }
+
           // Create a new user session
-          
-          const userSession = new UserSession();
-          userSession.userId = user._id;
-          userSession.user_name = userName;
-          var token = jwt.sign({ 
-            data: {
-              userId: userSession.userId,
-              user_name: userSession.user_name
-          },
-            exp: Math.floor(Date.now() / 1000) + (60 * 60)
-          }, 'private key');
+          createNewSession(user._id, userName).then((token) => {
+            if (token) {
 
-          userSession.token = token
+              return res.send({
+                success: true,
+                token: token,
+                message: "Successfully signed up."
+              });
 
-          userSession.save((err, doc) => {
-            if (err) {
+            } else {
+
               return res.send({
                 success: false,
                 token: "",
                 message: "Server Error: Could not create a user session.",
-              })
-            } else {
-              return res.send({
-                success: true,
-                token: token,
-                message: "Successfully created a new user."
-              })
+              });
+
             }
           });
 
@@ -146,7 +186,7 @@ module.exports = app => {
 
   app.post("/api/account/signin", (req, res, next) => { // Login to account
     const { body } = req;
-    const { password, email } = body;
+    var { password, email } = body;
 
     if (!email) { // Check if email exists
       return res.send({
@@ -178,7 +218,8 @@ module.exports = app => {
         });
       }
 
-      const user = users[0];
+      const user = users[0]; // Get current user
+
       if (!user.validPassword(password)) { // Verify password
         return res.send({
           success: false,
@@ -188,22 +229,29 @@ module.exports = app => {
 
       // Otherwise valid user
 
-      const userSession = new UserSession(); // Create new user session
-      userSession.userId = user._id;
-      userSession.save((err, doc) => {
-        if (err) {
+      // Create new user session
+      createNewSession(user._id, user.userName).then((token) => {
+
+        if (token) {
+
+          return res.send({
+            success: true,
+            message: "Valid sign in",
+            token: token
+          });
+
+        } else {
+
           return res.send({
             success: false,
-            message: "Error: server error"
+            token: "",
+            message: "Server Error: Could not create a user session."
           });
+
         }
 
-        return res.send({
-          success: true,
-          message: "Valid sign in",
-          token: doc._id
-        });
       });
+
     });
   });
 
@@ -216,46 +264,59 @@ module.exports = app => {
   app.get("/api/account/verify", (req, res, next) => {
     const { query } = req;
     const { token } = query;
-    // ?token = test
 
     // Verify the token is one of a kind and its not deleted
 
-    jwt.verify(token, 'private key', function(err, decoded) { // Verify if token is valid first and if not expired
-      if (err) {
-        UserSession.deleteOne({ token: token });
-        return res.send({
-          success: false,
-          message: "Error: Invalid or expired session."
+    if (UserSession.verifyToken(token)) {
+
+      UserSession.findOne( // Verify if the token is in user sessions database
+        {
+          token: token,
+          isDeleted: false
+        },
+        (err, sessions) => {
+
+          if (err) {
+
+            return res.send({
+              success: false,
+              message: "Error: Server error."
+            });
+
+          }
+
+          if (sessions == null) {
+
+            return res.send({
+              success: false,
+              message: "Error: Invalid session."
+            });
+
+          } else {
+
+            return res.send({
+              success: true,
+              message: "Verified",
+              userName: sessions.userName
+            });
+
+          }
         });
-      } else {
-        UserSession.findOne( // Verify if token is in user sessions database
-          {
-            token: token,
-            isDeleted: false
-          },
-          (err, sessions) => {
-            if (err) {
-              return res.send({
-                success: false,
-                message: "Error: Server error."
-              });
-            }
-            if (sessions == null) {
-              return res.send({
-                success: false,
-                message: "Error: Invalid session."
-              });
-            } else {
-              return res.send({
-                success: true,
-                message: "Verified",
-                user_name: sessions.user_name
-              });
-            }
-          });
-      }
+
+    } else {
+
+      // Token is invalid or expired
+
+      UserSession.deleteOne({ token: token }); // Delete session if it exists
+
+      return res.send({
+        success: false,
+        message: "Error: Invalid or expired session."
       });
-    });
+
+    }
+
+  });
 
   /*
     ========
@@ -266,7 +327,6 @@ module.exports = app => {
   app.get("/api/account/logout", (req, res, next) => { // Remove user session
     const { query } = req;
     const { token } = query;
-    // ?token = test
 
     //verify the token is one of a kind and its not deleted
 
@@ -277,13 +337,14 @@ module.exports = app => {
       },
       (err, sessions) => {
         if (err) {
-          console.log("Auth deleting error" + err);
+          // No session could be removed
           return res.send({
             success: false,
             message: "Error: Server error"
           });
+
         }
-        // console.log("Auth deleting successful");
+        // Session removed
         return res.send({
           success: true,
           message: "Logged out succesfully"

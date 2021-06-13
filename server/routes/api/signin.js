@@ -1,6 +1,6 @@
 const User = require("../../models/User");
 const UserSession = require("../../models/UserSession");
-const jwt = require('jsonwebtoken');
+const { createNewSession, removeSession, verifySession } = require('../../helpers/credentials');
 
 /*
     ==============
@@ -20,7 +20,7 @@ const jwt = require('jsonwebtoken');
         password: (String)
       }
 
-    -> POST './api/account/verify/': {
+    -> GET './api/account/verify/': {
         token: (String)
       }
 
@@ -29,45 +29,6 @@ const jwt = require('jsonwebtoken');
       }
     
 */
-
-function createNewSession(userId, userName) { // Create new session for user
-  return new Promise((resolve, reject) => {
-
-
-    // Verify if session already exists
-    UserSession.findOne( // Verify if the token is in user sessions database already
-      {
-        userName: userName,
-        isDeleted: false
-      },
-      (err, session) => {
-        if (!err) {
-          resolve(session.token);
-        }
-      });
-
-    const userSession = new UserSession();
-
-    userSession.userId = userId;
-    userSession.userName = userName;
-
-    // Generate new session token
-    userSession.token = userSession.generateToken(userId, userName);
-
-    userSession.save((err, doc) => {
-
-      if (err) {
-
-        reject(false);
-
-      } else {
-
-        resolve(userSession.token);
-
-      }
-    });
-  });
-}
 
 module.exports = app => {
   /*
@@ -171,6 +132,14 @@ module.exports = app => {
               });
 
             }
+          }).catch((err) => {
+
+            return res.send({
+              success: false,
+              token: "",
+              message: "Server Error: Could not create a user session.",
+            });
+
           });
 
         });
@@ -250,6 +219,14 @@ module.exports = app => {
 
         }
 
+      }).catch((err) => {
+
+        return res.send({
+          success: false,
+          token: "",
+          message: "Server Error: Could not create a user session."
+        });
+
       });
 
     });
@@ -261,60 +238,15 @@ module.exports = app => {
     ===================
   */
 
-  app.get("/api/account/verify", (req, res, next) => {
-    const { query } = req;
-    const { token } = query;
+  app.get("/api/account/verify", verifySession, (req, res) => {
+    
+    const session = req.session; // Provided session by middleware
 
-    // Verify the token is one of a kind and its not deleted
-
-    if (UserSession.verifyToken(token)) {
-
-      UserSession.findOne( // Verify if the token is in user sessions database
-        {
-          token: token,
-          isDeleted: false
-        },
-        (err, sessions) => {
-
-          if (err) {
-
-            return res.send({
-              success: false,
-              message: "Error: Server error."
-            });
-
-          }
-
-          if (sessions == null) {
-
-            return res.send({
-              success: false,
-              message: "Error: Invalid session."
-            });
-
-          } else {
-
-            return res.send({
-              success: true,
-              message: "Verified",
-              userName: sessions.userName
-            });
-
-          }
-        });
-
-    } else {
-
-      // Token is invalid or expired
-
-      UserSession.deleteOne({ token: token }); // Delete session if it exists
-
-      return res.send({
-        success: false,
-        message: "Error: Invalid or expired session."
-      });
-
-    }
+    return res.send({
+      success: true,
+      message: "Verified",
+      userName: session.userName
+    });
 
   });
 
@@ -328,28 +260,34 @@ module.exports = app => {
     const { query } = req;
     const { token } = query;
 
-    //verify the token is one of a kind and its not deleted
-
-    UserSession.findOneAndDelete(
-      {
-        token: token,
-        isDeleted: false
-      },
-      (err, sessions) => {
-        if (err) {
-          // No session could be removed
-          return res.send({
-            success: false,
-            message: "Error: Server error"
-          });
-
-        }
+    removeSession(token).then((result) => {
+      if (result) {
+        
         // Session removed
         return res.send({
           success: true,
           message: "Logged out succesfully"
         });
+
+      } else {
+
+        // No session could be removed
+        return res.send({
+          success: false,
+          message: "Error: Server error"
+        });
+
+      }
+    }).catch((err) => {
+
+      // No session could be removed
+      return res.send({
+        success: false,
+        message: "Error: Server error"
       });
+
+    });
+
   });
 
 };

@@ -10,15 +10,15 @@ const mongoose = require('mongoose');
 
 const PostSchema = new mongoose.Schema({
 
-    post_ID: {
+    postID: {
         type: String,
         default: ''
     },
-    user_name: {
+    userName: {
         type: String,
         default: ''
     },
-    image_url: {
+    imageUrl: {
         type: String,
         default: ''
     },

@@ -1,4 +1,4 @@
-const Keyword_Object = require('../models/Keyword_Object')
+const Category_Object = require('../models/Category_Object')
 // Import the Google Cloud client library
 const vision = require("@google-cloud/vision");
 
@@ -18,12 +18,10 @@ const client = new vision.ImageAnnotatorClient({
   keyFilename: "./server/helpers/google_keys/google_vision_api_key.json"
 });
 
-async function keyword_generator(url, post_id) {
+async function generateKeywords(url, post_id) {
 
   return new Promise(async (resolve, reject) => {
     let resultString = "";
-
-    console.log("\nProcessing image: " + url + "\n");
 
     // Performs label detection on the image file
     const [result] = await client.labelDetection(url);
@@ -31,10 +29,12 @@ async function keyword_generator(url, post_id) {
     const labels = result.labelAnnotations;
 
     for (let label of labels) {
+      // Minimum score of 50%
       if (label.score > .5) {
         resultString += label.description + ":" + label.score + ",";
         keyword_object_creator(label.description, post_id);
       }
+
     }
 
     resultString = resultString.slice(0, -1);
@@ -49,10 +49,10 @@ function keyword_object_creator(keyword, post_id) {
   // First it must check if the keyword exists. If it exists, must append the post id to keyword object post_array
   // If keyword object isn't found, create new one and append the keyword object to its post_array
 
-  Keyword_Object.findOne({ 'keyword': keyword.toLowerCase() }, 'any', function (err, keyword_result) {
+  Category_Object.findOne({ 'keyword': keyword.toLowerCase() }, 'any', function (err, keyword_result) {
     if (keyword_result == null) {
       // Not found
-      const newKeywordObj = new Keyword_Object();
+      const newKeywordObj = new Category_Object();
 
       newKeywordObj.keyword = keyword.toLowerCase();
       newKeywordObj.post_array.push(post_id);
@@ -60,34 +60,28 @@ function keyword_object_creator(keyword, post_id) {
       newKeywordObj.save((err, user) => {
         if (err) {
           console.log("Error creating new keyword object: " + err)
-
         }
-        else { console.log("Creation of new keyword object successful") }
-
-
 
       });
     } else {
       // Found
-      console.log("Keyword Found: " + keyword)
 
       let update = {
         // $set: {name: req.body.name},
-        $push: { post_array: post_id }
+        $push: { postsArray: post_id }
       }
 
       let options = { upsert: true };
 
       Keyword_Object.findOneAndUpdate({ 'keyword': keyword.toLowerCase() }, update, options, function (err, data) {
+
         if (err) {
           console.log("Error: " + err)
         }
-        else {
-          // console.log("Successful Update")
-        }
+        
       });
     }
   });
 }
 
-module.exports = { keyword_generator }
+module.exports = { generateKeywords }
